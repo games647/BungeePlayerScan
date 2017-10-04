@@ -25,11 +25,10 @@ import static net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT;
 
 class ScanCommand extends Command {
 
+    private BaseComponent[] emptyComponent = {};
+
     ScanCommand(String pluginName) {
         super(pluginName, pluginName + ".command");
-
-        System.out.println(getName());
-        System.out.println(getPermission());
     }
 
     @Override
@@ -52,7 +51,7 @@ class ScanCommand extends Command {
 
     private void printData(CommandSender sender, ProxiedPlayer player) {
         //virtual player data
-        sender.sendMessage(menu(builder("Player: ", GOLD).append(player.getName()).color(GREEN),
+        sender.sendMessage(menu(sender, builder("Player: ", GOLD).append(player.getName()).color(GREEN),
                 hoverMenu(LIGHT_PURPLE, DARK_PURPLE,
                         sub("", () -> player.getUniqueId().toString()),
                         sub("Display name", player::getDisplayName)
@@ -65,7 +64,7 @@ class ScanCommand extends Command {
         int ping = player.getPing();
         InetSocketAddress address = player.getAddress();
 
-        sender.sendMessage(menu(builder("Connection: ", GRAY).append(serverName).color(DARK_BLUE),
+        sender.sendMessage(menu(sender, builder("Connection: ", GRAY).append(serverName).color(DARK_BLUE),
                 hoverMenu(YELLOW, DARK_GREEN,
                         sub("Protocol", () -> valueOf(protocolVersion)),
                         sub("Online mode", () -> valueOf(onlineMode)),
@@ -74,11 +73,11 @@ class ScanCommand extends Command {
                 )));
 
         //permissions
-        sender.sendMessage(mapPerm("Permissions", player.getPermissions()));
-        sender.sendMessage(mapPerm("Groups", player.getGroups()));
+        sender.sendMessage(mapPerm(sender, "Permissions", player.getPermissions()));
+        sender.sendMessage(mapPerm(sender, "Groups", player.getGroups()));
 
         //forge
-        sender.sendMessage(menu(builder("Forge User: ", YELLOW).append(valueOf(player.isForgeUser())).color(BLUE),
+        sender.sendMessage(menu(sender, builder("Forge User: ", YELLOW).append(valueOf(player.isForgeUser())).color(BLUE),
                 map(player.getModList().entrySet(), mod -> {
                     String modName = mod.getKey();
                     String modVersion = mod.getValue();
@@ -95,7 +94,7 @@ class ScanCommand extends Command {
         SkinConfiguration skinParts = player.getSkinParts();
         boolean chatColors = player.hasChatColors();
 
-        sender.sendMessage(menu(builder("Client settings", GRAY),
+        sender.sendMessage(menu(sender, builder("Client settings", GRAY),
                 hoverMenu(GREEN, DARK_GREEN,
                         sub("View distance", () -> valueOf(viewDistance)),
                         sub("Locale", locale::getDisplayName),
@@ -111,14 +110,14 @@ class ScanCommand extends Command {
                 )));
     }
 
-    private BaseComponent[] mapPerm(String category, Collection<String> permInfo) {
-        return menu(builder(category + ": ", DARK_AQUA).append(valueOf(permInfo.size())).color(DARK_GRAY),
+    private BaseComponent[] mapPerm(CommandSender sender, String category, Collection<String> permInfo) {
+        return menu(sender, builder(category + ": ", DARK_AQUA).append(valueOf(permInfo.size())).color(DARK_GRAY),
                 map(permInfo, info -> builder(info, DARK_GREEN).append("\n").create()));
     }
 
     private <T> BaseComponent[] map(Collection<T> lst, Function<T, BaseComponent[]> mapper) {
         if (lst.isEmpty()) {
-            return new BaseComponent[]{};
+            return emptyComponent;
         }
 
         ComponentBuilder builder = new ComponentBuilder("\n");
@@ -130,10 +129,17 @@ class ScanCommand extends Command {
         return new ComponentBuilder(text).color(color);
     }
 
-    private BaseComponent[] menu(ComponentBuilder title, BaseComponent... hoverComp) {
+    private BaseComponent[] menu(CommandSender sender, ComponentBuilder title, BaseComponent... hoverComp) {
         ComponentBuilder builder = title;
         if (hoverComp.length > 0) {
-            builder = title.event(new HoverEvent(SHOW_TEXT, hoverComp));
+            if (sender instanceof ProxiedPlayer) {
+                title.event(new HoverEvent(SHOW_TEXT, hoverComp));
+            } else {
+                builder.append("\n");
+                Stream.of(hoverComp)
+                        .filter(comp -> comp.getExtra() == null)
+                        .forEach(comp -> builder.append("    ").append(new BaseComponent[]{comp}));
+            }
         }
 
         return builder.create();

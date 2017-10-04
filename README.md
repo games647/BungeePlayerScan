@@ -4,7 +4,8 @@
 
 Simple lightweight BungeeCord plugin that outputs all data about specific that could be extracted from the 
 official BungeeCord API. If you are invoking the command from in game it will make use of the hover feature. 
-This means you can hover over the interested category to get more information.
+This means you can hover over the interested category to get more information. If you using the command from the console
+we use tab stops to provide you a similar feature.
 
 ### Available data
 
