@@ -1,10 +1,10 @@
 package com.github.games647.playerscan;
 
-import java.net.InetSocketAddress;
 import java.util.Collection;
-import java.util.Locale;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -16,7 +16,6 @@ import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
-import net.md_5.bungee.api.connection.ProxiedPlayer.ChatMode;
 import net.md_5.bungee.api.plugin.Command;
 
 import static java.lang.String.valueOf;
@@ -25,7 +24,7 @@ import static net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT;
 
 class ScanCommand extends Command {
 
-    private BaseComponent[] emptyComponent = {};
+    private final BaseComponent[] emptyComponent = {};
 
     ScanCommand(String pluginName) {
         super(pluginName, pluginName + ".command");
@@ -53,23 +52,19 @@ class ScanCommand extends Command {
         //virtual player data
         sender.sendMessage(menu(sender, builder("Player: ", GOLD).append(player.getName()).color(GREEN),
                 hoverMenu(LIGHT_PURPLE, DARK_PURPLE,
-                        sub("", () -> player.getUniqueId().toString()),
+                        sub("", player.getUniqueId()::toString),
                         sub("Display name", player::getDisplayName)
                 )));
 
         //connection data
         String serverName = player.getServer().getInfo().getName();
-        boolean onlineMode = player.getPendingConnection().isOnlineMode();
-        int protocolVersion = player.getPendingConnection().getVersion();
-        int ping = player.getPing();
-        InetSocketAddress address = player.getAddress();
 
         sender.sendMessage(menu(sender, builder("Connection: ", GRAY).append(serverName).color(DARK_BLUE),
                 hoverMenu(YELLOW, DARK_GREEN,
-                        sub("Protocol", () -> valueOf(protocolVersion)),
-                        sub("Online mode", () -> valueOf(onlineMode)),
-                        sub("Address", address::getHostName),
-                        sub("Ping", () -> valueOf(ping))
+                        sub("Protocol", player.getPendingConnection()::getVersion),
+                        sub("Online mode", player.getPendingConnection()::isOnlineMode),
+                        sub("Address", player.getAddress()::getHostName),
+                        sub("Ping", player::getPing)
                 )));
 
         //permissions
@@ -77,7 +72,8 @@ class ScanCommand extends Command {
         sender.sendMessage(mapPerm(sender, "Groups", player.getGroups()));
 
         //forge
-        sender.sendMessage(menu(sender, builder("Forge User: ", YELLOW).append(valueOf(player.isForgeUser())).color(BLUE),
+        sender.sendMessage(menu(sender,
+                builder("Forge User: ", YELLOW).append(valueOf(player.isForgeUser())).color(BLUE),
                 map(player.getModList().entrySet(), mod -> {
                     String modName = mod.getKey();
                     String modVersion = mod.getValue();
@@ -88,30 +84,27 @@ class ScanCommand extends Command {
                 })));
 
         //Client settings
-        byte viewDistance = player.getViewDistance();
-        ChatMode chatMode = player.getChatMode();
-        Locale locale = player.getLocale();
         SkinConfiguration skinParts = player.getSkinParts();
-        boolean chatColors = player.hasChatColors();
 
         sender.sendMessage(menu(sender, builder("Client settings", GRAY),
                 hoverMenu(GREEN, DARK_GREEN,
-                        sub("View distance", () -> valueOf(viewDistance)),
-                        sub("Locale", locale::getDisplayName),
-                        sub("Chat mode", chatMode::name),
-                        sub("Chat color support", () -> valueOf(chatColors)),
-                        sub("Displays cape", () -> valueOf(skinParts.hasCape())),
-                        sub("Displays hat", () -> valueOf(skinParts.hasHat())),
-                        sub("Displays jacket", () -> valueOf(skinParts.hasJacket())),
-                        sub("Displays left pants", () -> valueOf(skinParts.hasLeftPants())),
-                        sub("Displays right pants", () -> valueOf(skinParts.hasRightPants())),
-                        sub("Displays left sleeve", () -> valueOf(skinParts.hasLeftSleeve())),
-                        sub("Displays right sleeve", () -> valueOf(skinParts.hasRightSleeve()))
+                        sub("View distance", player::getViewDistance),
+                        sub("Locale", (Supplier<String>) player.getLocale()::getDisplayName),
+                        sub("Chat mode", player.getChatMode()::name),
+                        sub("Chat color support", player::hasChatColors),
+                        sub("Displays cape", skinParts::hasCape),
+                        sub("Displays hat", skinParts::hasHat),
+                        sub("Displays jacket", skinParts::hasJacket),
+                        sub("Displays left pants", skinParts::hasLeftPants),
+                        sub("Displays right pants", skinParts::hasRightPants),
+                        sub("Displays left sleeve", skinParts::hasLeftSleeve),
+                        sub("Displays right sleeve", skinParts::hasRightSleeve)
                 )));
     }
 
     private BaseComponent[] mapPerm(CommandSender sender, String category, Collection<String> permInfo) {
-        return menu(sender, builder(category + ": ", DARK_AQUA).append(valueOf(permInfo.size())).color(DARK_GRAY),
+        return menu(sender, builder(category + ": ", DARK_AQUA)
+                        .append(valueOf(permInfo.size())).color(DARK_GRAY),
                 map(permInfo, info -> builder(info, DARK_GREEN).append("\n").create()));
     }
 
@@ -130,19 +123,18 @@ class ScanCommand extends Command {
     }
 
     private BaseComponent[] menu(CommandSender sender, ComponentBuilder title, BaseComponent... hoverComp) {
-        ComponentBuilder builder = title;
         if (hoverComp.length > 0) {
             if (sender instanceof ProxiedPlayer) {
                 title.event(new HoverEvent(SHOW_TEXT, hoverComp));
             } else {
-                builder.append("\n");
+                title.append("\n");
                 Stream.of(hoverComp)
                         .filter(comp -> comp.getExtra() == null)
-                        .forEach(comp -> builder.append("    ").append(new BaseComponent[]{comp}));
+                        .forEach(comp -> title.append("    ").append(new BaseComponent[]{comp}));
             }
         }
 
-        return builder.create();
+        return title.create();
     }
 
     private BaseComponent[] hoverMenu(ChatColor primaryColor, ChatColor secondaryColor, SubMenu... lines) {
@@ -165,5 +157,13 @@ class ScanCommand extends Command {
         }
 
         return new SubMenu(title, supplier);
+    }
+
+    private SubMenu sub(String displayName, BooleanSupplier supplier) {
+        return sub(displayName, () -> valueOf(supplier.getAsBoolean()));
+    }
+
+    private SubMenu sub(String displayName, IntSupplier supplier) {
+        return sub(displayName, () -> valueOf(supplier.getAsInt()));
     }
 }

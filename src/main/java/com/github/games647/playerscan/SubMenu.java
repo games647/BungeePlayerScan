@@ -2,7 +2,7 @@ package com.github.games647.playerscan;
 
 import java.util.function.Supplier;
 
-public class SubMenu {
+class SubMenu {
 
     private final String title;
     private final Supplier<String> value;
@@ -12,11 +12,11 @@ public class SubMenu {
         this.value = value;
     }
 
-    public String getTitle() {
+    String getTitle() {
         return title;
     }
 
-    public String getValue() {
+    String getValue() {
         return value.get();
     }
 }
